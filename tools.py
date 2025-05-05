@@ -8,7 +8,7 @@ from typing import List
 def collect_hmo(hmo: str) -> str:
     if hmo.lower() in ["maccabi", "meuhedet", "clalit"]:
         return json.dumps({
-            "message": f"Great. Could you provide your 9-digit HMO card number?",
+            "message": f"Great. What is your insurance membership tier? (זהב / כסף / ארד)",
             "hmo": hmo.lower()
         })
     return "HMO must be one of: Maccabi, Meuhedet, Clalit."
@@ -26,6 +26,7 @@ def confirm_information(confirmation: str) -> str:
     if confirmation.lower() == "yes":
         return json.dumps({
             "message": "✅ Thanks for confirming! You may now ask me questions about your health services.",
+            "confirmed": True
         })
     else:
         return json.dumps({

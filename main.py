@@ -65,6 +65,8 @@ def run_phase_1(language: str):
                 tool_name = tool_call.function.name
                 tool_args = tool_call.function.arguments
 
+                print(f"[🔧] Handling tool: {tool_name} with args: {tool_args}")
+
                 result = handle_tool_call(tool_name, tool_args)
 
                 # ✅ Append tool result message
@@ -77,9 +79,12 @@ def run_phase_1(language: str):
                 # Extract info if possible
                 try:
                     data = json.loads(result)
+                    print(f"[📥] Tool returned: {data}")
+
                     hmo = data.get("hmo", hmo)
-                    tier = data.get("tier", tier)
-                    if "✅" in data.get("message", ""):
+                    tier = data.get("tier", tier)             
+
+                    if data.get("confirmed") is True :
                         confirmed = True
                 except json.JSONDecodeError:
                     pass
