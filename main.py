@@ -3,14 +3,25 @@
 import os
 import json
 from pathlib import Path
-from logic.azure_calls import get_chat_completion
+from logic.azure_calls import get_chat_completion, get_embedding
 from tools import tool_descriptions, collect_hmo, collect_insurance_tier, confirm_information
+from src.extract_data_embd import run_extraction
+from src.embd_chunks import normalize_hmo_tier, load_data, get_top_matches, get_answer_from_metadata, filter_by_hmo_tier, build_and_save_index
 
 def load_system_prompt(language: str) -> str:
     prompt_dir = Path(__file__).resolve().parent / "prompts"
     filename = "info_prompt_en.txt" if language == "en" else "info_prompt_he.txt"
     with open(prompt_dir / filename, "r", encoding="utf-8") as f:
         return f.read()
+
+def translate_to_hebrew(text: str) -> str:
+    messages = [
+        {"role": "system", "content": "Translate the following question from English to Hebrew. Respond with Hebrew only."},
+        {"role": "user", "content": text}
+    ]
+    response = get_chat_completion(messages)
+    return response.strip()
+
 
 def handle_tool_call(tool_name: str, arguments: str):
     data = json.loads(arguments)
@@ -115,6 +126,47 @@ def run_phase_1(language: str):
     print(f"💎 Tier: {tier}")
     return {"hmo": hmo, "tier": tier, "confirmed": True}
 
+def run_phase_2(hmo: str, tier: str, lang: str):
+    print("\n🤖 BOT: You can now ask me questions about your medical services.")
+    print("💬 Type 'exit' to stop.\n")
+
+    
+    # print("\n🔧Extracting structured text from HTML files...")
+    # run_extraction()
+
+    # print("\n⚙️  Generating embeddings and building FAISS index...")
+    # build_and_save_index()
+
+    # print("\n✅ Knowledge base is ready!")
+    
+    
+    # Normalize HMO and tier to Hebrew
+    hmo_norm, tier_norm = normalize_hmo_tier(hmo, tier)
+
+    index, metadata = load_data()
+    mask = filter_by_hmo_tier(metadata, hmo_norm, tier_norm)
+
+    while True:
+        user_question = input("🧑 You: ").strip()
+        if user_question.lower() == "exit":
+            print("👋 Goodbye!")
+            break
+        
+        if lang == "en":
+            user_question= translate_to_hebrew(user_question)  
+            print(f"Translated Question: {user_question}")  
+
+        query_vec = get_embedding(user_question)
+        # print(f"\n🔍 Query Vector: {query_vec}")
+
+        top_indices = get_top_matches(index, query_vec, mask, top_k=5)
+        print(f"📄 Top Indices: {top_indices}")
+        context_chunks = [metadata[i]["text"] for i in top_indices]
+
+        answer = get_answer_from_metadata(user_question, context_chunks, hmo, tier)
+        print(f"\n🤖 BOT: {answer}\n")
+
+
 if __name__ == "__main__":
     lang_input = input("🌐 Choose a language (en/he): ").strip().lower()
     if lang_input not in ("en", "he"):
@@ -122,3 +174,7 @@ if __name__ == "__main__":
         lang_input = "en"
 
     user_info = run_phase_1(lang_input)
+    print(f"user_info: {user_info}")
+
+    if user_info and user_info.get("confirmed"):
+        run_phase_2(user_info["hmo"], user_info["tier"], lang_input)

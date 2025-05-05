@@ -1,3 +1,4 @@
+# src/extract_data_embd.py
 
 from bs4 import BeautifulSoup
 import json
@@ -101,18 +102,21 @@ def extract_chunks_from_html(html_files: Dict[str, str], file_mappings: List[tup
 
                 for part in parts:
                     part_soup = BeautifulSoup(part, 'html.parser')
-                    text = part_soup.get_text(strip=True)
-                    for tier in TIERS:
-                        if text.startswith(tier):
-                            benefit_text = text.replace(tier + ":", "").strip()
+                    strong_tags = part_soup.find_all('strong')
+                    for strong in strong_tags:
+                        strong_text = strong.get_text(strip=True).replace(":", "")
+                        if strong_text in TIERS:
+                            tier = strong_text
+                            benefit_text = strong.next_sibling.strip() if strong.next_sibling else ""
                             chunk = {
                                 "category": category,
                                 "service": service_name,
                                 "hmo": hmo_name,
                                 "tier": tier,
-                                "text": f"בשירות {service_name} בקטגוריה {category}, עבור חברי {hmo_name} במסלול {tier}: {benefit_text}"
+                                "text": f"קטגוריה: {category}\nשירות: {service_name}\nקופת חולים: {hmo_name}\nמסלול: {tier}\nהטבה: {benefit_text}"
                             }
                             chunks.append(chunk)
+
         logging.info(f"Extracted chunks from: {filename}")
 
     return chunks
@@ -124,12 +128,12 @@ def get_chunks_for_embedding() -> List[Dict[str, Any]]:
     html_files = load_all_html_files(str(html_dir))
 
     FILES = [
-        ("alternative_services", "רפואה משלימה"),
-        ("communication_clinic_services", "מרפאות תקשורת"),
+        # ("alternative_services", "רפואה משלימה"),
+        # ("communication_clinic_services", "מרפאות תקשורת"),
         ("dental_services", "מרפאות שיניים"),
-        ("optometry_services", "אופטומטריה"),
-        ("pragrency_services", "הריון"),
-        ("workshops_services", "סדנאות בריאות")
+        # ("optometry_services", "אופטומטריה"),
+        # ("pragrency_services", "הריון"),
+        # ("workshops_services", "סדנאות בריאות")
     ]
     return extract_chunks_from_html(html_files, FILES)
 

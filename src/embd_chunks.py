@@ -4,7 +4,7 @@ import json
 import faiss
 import numpy as np
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import logging
 from dotenv import load_dotenv
 import os
@@ -25,6 +25,29 @@ FAISS_INDEX_PATH = BASE_DIR / "data" / "kb_index.faiss"
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
+# Mapping for user input normalization
+def normalize_hmo_tier(hmo: str, tier: str) -> Tuple[str, str]:
+    HMO_MAP: dict[str, str] = {
+        "maccabi": "מכבי", "מכבי": "מכבי",
+        "meuhedet": "מאוחדת", "מאוחדת": "מאוחדת",
+        "clalit": "כללית", "כללית": "כללית"
+    }
+
+    TIER_MAP: dict[str, str] = {
+        "gold": "זהב", "זהב": "זהב",
+        "silver": "כסף", "כסף": "כסף",
+        "bronze": "ארד", "ארד": "ארד"
+    }
+
+    hmo_normalized = HMO_MAP.get(hmo.lower())
+    tier_normalized = TIER_MAP.get(tier.lower())
+
+    if not hmo_normalized or not tier_normalized:
+        raise ValueError(f"❌ Invalid HMO or tier: '{hmo}' or '{tier}'")
+
+    return hmo_normalized, tier_normalized
+
+
 def build_faiss_index(vectors: List[List[float]]) -> faiss.IndexFlatL2:
     """Create FAISS index from vectors."""
     dim = len(vectors[0])
@@ -39,10 +62,15 @@ def load_data():
         metadata = json.load(f)
     return index, metadata
 
+# def filter_by_hmo_tier(metadata: List[Dict], hmo: str, tier_en: str) -> List[int]:
+#     """Return indexes that match the user HMO and tier."""
+#     return [i for i, chunk in enumerate(metadata)
+#             if chunk.get("hmo") == hmo and chunk.get("tier_en") == tier_en]
+
 def filter_by_hmo_tier(metadata: List[Dict], hmo: str, tier: str) -> List[int]:
-    """Return indexes that match the user HMO and tier."""
     return [i for i, chunk in enumerate(metadata)
             if chunk.get("hmo") == hmo and chunk.get("tier") == tier]
+
 
 def get_top_matches(index, query_vec, mask_indices, top_k=5) -> List[int]:
     """Get top K matches from the FAISS index."""
@@ -57,13 +85,16 @@ def get_top_matches(index, query_vec, mask_indices, top_k=5) -> List[int]:
         D, I = index.search(np.array([query_vec]).astype("float32"), top_k)
         return I[0]
 
-def get_answer_from_metadata(question: str, context_chunks: List[str]) -> str:
+def get_answer_from_metadata(question: str, context_chunks: List[str], hmo: str, tier: str) -> str:
     """Ask GPT-4o using retrieved context and user question."""
     prompt = (
         "Based on the user's HMO and insurance tier, answer the following question "
-        "using the information provided below:\n\n"
-        + "\n".join(f"- {chunk}" for chunk in context_chunks)
-        + f"\n\nUser's question: {question}"
+        "using the information provided below.\n\n"
+        f"User's HMO: {hmo}\n"
+        f"User's insurance tier: {tier}\n\n"
+        f"User's question: {question}\n\n"
+        f"Data for answer:\n"
+        f"{' '.join(f'- {chunk}' for chunk in context_chunks)}\n\n"
     )
 
     messages = [{"role": "user", "content": prompt}]
