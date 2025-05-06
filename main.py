@@ -6,17 +6,26 @@ from pathlib import Path
 from logic.azure_calls import get_chat_completion, get_embedding
 from tools import tool_descriptions, collect_hmo, collect_insurance_tier, confirm_information
 from src.extract_data_embd import run_extraction
-from src.embd_chunks import normalize_hmo_tier, load_data, get_top_matches, get_answer_from_metadata, filter_by_hmo_tier, build_and_save_index
+from src.embd_chunks import normalize_hmo_tier, load_data, get_top_matches, get_answer_from_metadata, filter_by_hmo_tier, build_and_save_index, is_kb_ready
 
 def load_system_prompt(language: str) -> str:
     prompt_dir = Path(__file__).resolve().parent / "prompts"
-    filename = "info_prompt_en.txt" if language == "en" else "info_prompt_he.txt"
+    filename = "info_prompt_en.txt" if language == "english" else "info_prompt_he.txt"
     with open(prompt_dir / filename, "r", encoding="utf-8") as f:
         return f.read()
 
 def translate_to_hebrew(text: str) -> str:
+    system_message = """
+    You are a helpful assistant that translates English to Hebrew. 
+    You will be given a question in English related to medical services in Israel.
+    Your task is to translate it to Hebrew.
+    Translate the following question from English to Hebrew. Respond with Hebrew only.\n
+    If the following words are in the text, use this mapping to transtlate them: 
+    'HMO' -> 'קופת חולים', 'insurance tier' -> 'רמת ביטוח', 'medical services' -> 'שירותי בריאות', 'maccabi' -> 'מכבי', 'clalit' -> 'כללית', 'meuhedet' -> 'מאוחדת'.
+    """
+
     messages = [
-        {"role": "system", "content": "Translate the following question from English to Hebrew. Respond with Hebrew only."},
+        {"role": "system", "content": system_message},
         {"role": "user", "content": text}
     ]
     response = get_chat_completion(messages)
@@ -127,19 +136,18 @@ def run_phase_1(language: str):
     return {"hmo": hmo, "tier": tier, "confirmed": True}
 
 def run_phase_2(hmo: str, tier: str, lang: str):
+    if not is_kb_ready():
+        print("\n🔧 Knowledge base not found. Building it...")
+        run_extraction()
+        build_and_save_index()
+        print("✅ Knowledge base built.")
+    else:
+        print("✅ Knowledge base is already ready. Skipping build.")
+
     print("\n🤖 BOT: You can now ask me questions about your medical services.")
     print("💬 Type 'exit' to stop.\n")
 
-    
-    # print("\n🔧Extracting structured text from HTML files...")
-    # run_extraction()
 
-    # print("\n⚙️  Generating embeddings and building FAISS index...")
-    # build_and_save_index()
-
-    # print("\n✅ Knowledge base is ready!")
-    
-    
     # Normalize HMO and tier to Hebrew
     hmo_norm, tier_norm = normalize_hmo_tier(hmo, tier)
 
@@ -152,7 +160,7 @@ def run_phase_2(hmo: str, tier: str, lang: str):
             print("👋 Goodbye!")
             break
         
-        if lang == "en":
+        if lang == "english":
             user_question= translate_to_hebrew(user_question)  
             print(f"Translated Question: {user_question}")  
 
@@ -163,15 +171,15 @@ def run_phase_2(hmo: str, tier: str, lang: str):
         print(f"📄 Top Indices: {top_indices}")
         context_chunks = [metadata[i]["text"] for i in top_indices]
 
-        answer = get_answer_from_metadata(user_question, context_chunks, hmo, tier)
+        answer = get_answer_from_metadata(user_question, context_chunks, hmo, tier, lang)
         print(f"\n🤖 BOT: {answer}\n")
 
 
 if __name__ == "__main__":
-    lang_input = input("🌐 Choose a language (en/he): ").strip().lower()
-    if lang_input not in ("en", "he"):
+    lang_input = input("🌐 Choose a language (English/Hebrew): ").strip().lower()
+    if lang_input not in ("english", "hebrew"):
         print("⚠️ Invalid input. Defaulting to English.\n")
-        lang_input = "en"
+        lang_input = "english"
 
     user_info = run_phase_1(lang_input)
     print(f"user_info: {user_info}")

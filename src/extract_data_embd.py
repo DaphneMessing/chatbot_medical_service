@@ -117,6 +117,28 @@ def extract_chunks_from_html(html_files: Dict[str, str], file_mappings: List[tup
                             }
                             chunks.append(chunk)
 
+
+
+
+                # ✅ Extract info under the table (contact info, websites, etc.)
+        if table:
+            after_table = table.find_all_next()
+            current_section = None
+
+            for tag in after_table:
+                if tag.name == "h3":
+                    current_section = tag.get_text(strip=True)
+                elif tag.name == "ul" and current_section:
+                    items = tag.find_all("li")
+                    for item in items:
+                        contact_text = item.get_text(" ", strip=True)
+                        chunks.append({
+                            "category": category,
+                            "section": current_section,
+                            "text": f"{current_section} - {contact_text}"
+                        })
+
+
         logging.info(f"Extracted chunks from: {filename}")
 
     return chunks

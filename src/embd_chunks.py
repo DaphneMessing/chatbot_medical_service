@@ -22,6 +22,10 @@ EMBEDDINGS_PATH = BASE_DIR / "data" / "kb_embeddings.npz"
 METADATA_PATH = BASE_DIR / "data" / "kb_metadata.json"
 FAISS_INDEX_PATH = BASE_DIR / "data" / "kb_index.faiss"
 
+def is_kb_ready() -> bool:
+    """Check if the knowledge base files already exist."""
+    return all(path.exists() for path in [KB_PATH, METADATA_PATH, FAISS_INDEX_PATH, EMBEDDINGS_PATH])
+
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -85,11 +89,12 @@ def get_top_matches(index, query_vec, mask_indices, top_k=5) -> List[int]:
         D, I = index.search(np.array([query_vec]).astype("float32"), top_k)
         return I[0]
 
-def get_answer_from_metadata(question: str, context_chunks: List[str], hmo: str, tier: str) -> str:
+def get_answer_from_metadata(question: str, context_chunks: List[str], hmo: str, tier: str, language: str) -> str:
     """Ask GPT-4o using retrieved context and user question."""
     prompt = (
         "Based on the user's HMO and insurance tier, answer the following question "
         "using the information provided below.\n\n"
+        f"Your answer must be in the language: {language}\n\n" 
         f"User's HMO: {hmo}\n"
         f"User's insurance tier: {tier}\n\n"
         f"User's question: {question}\n\n"
