@@ -22,8 +22,19 @@ def collect_insurance_tier(tier: str) -> str:
         })
     return "Insurance Tier must be one of: Gold, Silver, Bronze."
 
+# def confirm_information(confirmation: str) -> str:
+#     if confirmation.lower() == "yes":
+#         return json.dumps({
+#             "message": "✅ Thanks for confirming! You may now ask me questions about your health services.",
+#             "confirmed": True
+#         })
+#     else:
+#         return json.dumps({
+#             "message": "Okay. Please restart the form and provide your information again.",
+#         })
+
 def confirm_information(confirmation: str) -> str:
-    if confirmation.lower() == "yes":
+    if "yes" in confirmation.lower():
         return json.dumps({
             "message": "✅ Thanks for confirming! You may now ask me questions about your health services.",
             "confirmed": True
@@ -31,8 +42,8 @@ def confirm_information(confirmation: str) -> str:
     else:
         return json.dumps({
             "message": "Okay. Please restart the form and provide your information again.",
+            "confirmed": False
         })
-
 
 # --- Tool Descriptions for OpenAI Function Calling ---
 
