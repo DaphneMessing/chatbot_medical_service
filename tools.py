@@ -3,6 +3,9 @@ from typing import Literal
 import json
 import logging
 from typing import List
+import logging
+
+
 
 
 def collect_hmo(hmo: str) -> str:
@@ -34,16 +37,44 @@ def collect_insurance_tier(tier: str) -> str:
 #         })
 
 def confirm_information(confirmation: str) -> str:
-    if "yes" in confirmation.lower():
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 confirm_information received: {confirmation}")
+    if confirmation.lower() in ["yes"]:
         return json.dumps({
-            "message": "✅ Thanks for confirming! You may now ask me questions about your health services.",
+            "message": f"✅ Thanks for confirming! You may now ask me questions about your health services",
             "confirmed": True
+        })
+    elif confirmation.lower() in ["no"]:
+        return json.dumps({
+            "message": f"Okay. Please restart the form and provide your information again.",
+            "confirmed": False
         })
     else:
         return json.dumps({
-            "message": "Okay. Please restart the form and provide your information again.",
+            "message": f"Invalid response. Please reply with 'yes' or 'no'.",
             "confirmed": False
         })
+
+
+
+
+
+
+
+    # if "yes" in confirmation.lower():
+    #     return json.dumps({
+    #         "message": "✅ Thanks for confirming! You may now ask me questions about your health services.",
+    #         "confirmed": True
+    #     })
+    # else:
+    #     return json.dumps({
+    #         "message": "Okay. Please restart the form and provide your information again.",
+    #         "confirmed": False
+    #     })
+    
+
+
+
 
 # --- Tool Descriptions for OpenAI Function Calling ---
 
@@ -85,7 +116,7 @@ tool_descriptions = [
             "description": "Confirm user information has been collected correctly.",
             "parameters": {
                 "type": "object",
-                "properties": {"confirmation": {"type": "string"}},
+                "properties": {"confirmation": {"type": "string", "enum": ["yes", "no"]}},
                 "required": ["confirmation"],
             },
         },

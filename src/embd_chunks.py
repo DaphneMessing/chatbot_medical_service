@@ -8,12 +8,13 @@ from typing import List, Dict, Tuple
 import logging
 from dotenv import load_dotenv
 import os
-
-# ✅ Import from centralized Azure logic
 from logic.azure_calls import get_embedding, get_chat_completion
 
 # Load environment variables
 load_dotenv()
+
+# Initialize logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,11 +27,10 @@ def is_kb_ready() -> bool:
     """Check if the knowledge base files already exist."""
     return all(path.exists() for path in [KB_PATH, METADATA_PATH, FAISS_INDEX_PATH, EMBEDDINGS_PATH])
 
-# Initialize logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-# Mapping for user input normalization
 def normalize_hmo_tier(hmo: str, tier: str) -> Tuple[str, str]:
+    """Normalize HMO and tier names to a standard format."""
+
     HMO_MAP: dict[str, str] = {
         "maccabi": "מכבי", "מכבי": "מכבי",
         "meuhedet": "מאוחדת", "מאוחדת": "מאוחדת",
@@ -53,7 +53,7 @@ def normalize_hmo_tier(hmo: str, tier: str) -> Tuple[str, str]:
 
 
 def build_faiss_index(vectors: List[List[float]]) -> faiss.IndexFlatL2:
-    """Create FAISS index from vectors."""
+    """Create FAISS index from vectors  """
     dim = len(vectors[0])
     index = faiss.IndexFlatL2(dim)
     index.add(np.array(vectors).astype("float32"))
@@ -66,18 +66,30 @@ def load_data():
         metadata = json.load(f)
     return index, metadata
 
-# def filter_by_hmo_tier(metadata: List[Dict], hmo: str, tier_en: str) -> List[int]:
-#     """Return indexes that match the user HMO and tier."""
+
+# def filter_by_hmo_tier(metadata: List[Dict], hmo: str, tier: str) -> List[int]:
+#     """Filter metadata by HMO and tier."""
 #     return [i for i, chunk in enumerate(metadata)
-#             if chunk.get("hmo") == hmo and chunk.get("tier_en") == tier_en]
+#             if chunk.get("hmo") == hmo and chunk.get("tier") == tier]
 
 def filter_by_hmo_tier(metadata: List[Dict], hmo: str, tier: str) -> List[int]:
-    return [i for i, chunk in enumerate(metadata)
-            if chunk.get("hmo") == hmo and chunk.get("tier") == tier]
-
-
+    """ Filter metadata by HMO and tier."""
+    filtered_indices = []
+    for i, chunk in enumerate(metadata):
+        hmo_val = chunk.get("hmo")
+        tier_val = chunk.get("tier")
+        if (hmo_val is None or hmo_val == hmo) and (tier_val is None or tier_val == tier):
+            filtered_indices.append(i)
+    
+    return filtered_indices
 def get_top_matches(index, query_vec, mask_indices, top_k=5) -> List[int]:
-    """Get top K matches from the FAISS index."""
+    """
+    Given a user query embedding, retrieves top-k nearest text chunks (using Euclidean distance). 
+    Returns :
+    - I: the indices of the closest vectors in the FAISS index
+    - D: the corresponding distances 
+    """
+
     if mask_indices:
         all_vecs = np.load(EMBEDDINGS_PATH)["vectors"]
         vectors_to_search = all_vecs[mask_indices]
@@ -90,7 +102,7 @@ def get_top_matches(index, query_vec, mask_indices, top_k=5) -> List[int]:
         return I[0]
 
 def get_answer_from_metadata(question: str, context_chunks: List[str], hmo: str, tier: str, language: str) -> str:
-    """Ask GPT-4o using retrieved context and user question."""
+    """Ask GPT using retrieved context chunks and user question."""
     prompt = (
         "Based on the user's HMO and insurance tier, answer the following question "
         "using the information provided below.\n\n"
@@ -106,12 +118,19 @@ def get_answer_from_metadata(question: str, context_chunks: List[str], hmo: str,
     return get_chat_completion(messages, temperature=0.3)
 
 def build_and_save_index():
-    """Main pipeline: read structured data, create embeddings, save index + metadata."""
+    """
+    Main pipeline: load "structured_kb.json", read structured data, create embeddings.
+    Save embeddings to kb_embeddings.npz, FAISS index to kb_index.faiss, metadata to kb_meta_data.json.
+    """
+    # load all chunks from the knowledge base- structured_kb.json
     with open(KB_PATH, "r", encoding="utf-8") as f:
         chunks = json.load(f)
 
     logging.info(f"Generating embeddings for {len(chunks)} chunks...")
-    texts = [chunk["text"] for chunk in chunks]
+
+    # list of texts to embed
+    texts = [chunk["text"] for chunk in chunks]\
+    # Get embeddings for each text chunk
     vectors = [get_embedding(text) for text in texts]
 
     # Save embeddings

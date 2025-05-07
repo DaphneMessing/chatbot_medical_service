@@ -58,6 +58,26 @@ def handle_tool_call(tool_name: str, arguments: str):
         return confirm_information(data["confirmation"])
     return "Unknown tool call."    
 
+
+
+def translate_to_hebrew(text: str) -> str:
+    system_message = """
+    You are a helpful assistant that translates English to Hebrew. 
+    You will be given a question in English related to medical services in Israel.
+    Your task is to translate it to Hebrew.
+    Translate the following question from English to Hebrew. Respond with Hebrew only.\n
+    If the following words are in the text, use this mapping to transtlate them: 
+    'HMO' -> 'קופת חולים', 'insurance tier' -> 'רמת ביטוח', 'medical services' -> 'שירותי בריאות', 'maccabi' -> 'מכבי', 'clalit' -> 'כללית', 'meuhedet' -> 'מאוחדת'.
+    """
+
+    messages = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": text}
+    ]
+    response = get_chat_completion(messages)
+    return response.strip()
+
+
 # Enable CORS (for Streamlit frontend)
 app.add_middleware(
     CORSMiddleware,
@@ -76,6 +96,12 @@ class ChatRequest(BaseModel):
     tier: str = ""
     confirmed: str= ""
 
+
+class Phase2Request(BaseModel):
+    hmo: str
+    tier: str
+    lang: str
+    question: str
 
 @app.post("/phase_1")
 async def phase_1(request: ChatRequest):
@@ -172,3 +198,33 @@ async def phase_1(request: ChatRequest):
     except Exception as e:
         logger.error(f"❌ Exception occurred: {e}")
         return {"response": f"❌ Internal server error: {str(e)}"}
+
+
+
+
+@app.post("/phase_2")
+async def phase_2(request: Phase2Request):
+    try:
+        logger.info("📥 Phase 2 request received")
+        logger.info(f"HMO: {request.hmo}, Tier: {request.tier}, Lang: {request.lang}")
+        logger.info(f"User question: {request.question}")
+
+        hmo_norm, tier_norm = normalize_hmo_tier(request.hmo, request.tier)
+        index, metadata = load_data()
+        mask = filter_by_hmo_tier(metadata, hmo_norm, tier_norm)
+
+        user_question = request.question
+        if request.lang.lower() == "english":
+            user_question = translate_to_hebrew(user_question)
+            logger.info(f"Translated to Hebrew: {user_question}")
+
+        query_vec = get_embedding(user_question)
+        top_indices = get_top_matches(index, query_vec, mask, top_k=5)
+        context_chunks = [metadata[i]["text"] for i in top_indices]
+        answer = get_answer_from_metadata(user_question, context_chunks, request.hmo, request.tier, request.lang)
+
+        return {"answer": answer}
+
+    except Exception as e:
+        logger.error(f"❌ Error in Phase 2: {e}")
+        return {"answer": f"❌ Failed to generate answer: {str(e)}"}

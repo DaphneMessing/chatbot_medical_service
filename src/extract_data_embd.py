@@ -23,10 +23,12 @@ HMO_MAPPING: Dict[int, str] = {
 TIERS: List[str] = ["זהב", "כסף", "ארד"]
 
 def parse_html_file(file_path: str) -> str:
+    """Parse an HTML file and return its content as a string."""
     with open(file_path, "r", encoding="utf-8") as f:
         return f.read()
 
 def load_all_html_files(directory: str) -> Dict[str, str]:
+    """Load all HTML files from a directory and return a dictionary with filenames as keys."""
     knowledge_base: Dict[str, str] = {}
     for file in os.listdir(directory):
         if file.endswith('.html'):
@@ -37,6 +39,8 @@ def load_all_html_files(directory: str) -> Dict[str, str]:
     return knowledge_base
 
 def extract_chunks_from_html(html_files: Dict[str, str], file_mappings: List[tuple]) -> List[Dict[str, Any]]:
+    """Parses <p>, <ul>, and <table> tags to create chunks of relevant text, each with attached metadata."""
+
     chunks: List[Dict[str, Any]] = []
 
     for filename, category in file_mappings:
@@ -117,10 +121,7 @@ def extract_chunks_from_html(html_files: Dict[str, str], file_mappings: List[tup
                             }
                             chunks.append(chunk)
 
-
-
-
-                # ✅ Extract info under the table (contact info, websites, etc.)
+        # Extract info under the table (contact info, websites, etc.)
         if table:
             after_table = table.find_all_next()
             current_section = None
@@ -145,6 +146,7 @@ def extract_chunks_from_html(html_files: Dict[str, str], file_mappings: List[tup
 
 
 def get_chunks_for_embedding() -> List[Dict[str, Any]]:
+    """Load HTML files and extract relevant chunks."""
     BASE_DIR = Path(__file__).resolve().parent.parent
     html_dir = BASE_DIR / "data" / "phase2_data"
     html_files = load_all_html_files(str(html_dir))
@@ -160,6 +162,7 @@ def get_chunks_for_embedding() -> List[Dict[str, Any]]:
     return extract_chunks_from_html(html_files, FILES)
 
 def run_extraction():
+    """Main pipeline to extract and write output as structured_kb.json"""
     BASE_DIR = Path(__file__).resolve().parent.parent
     output_path = BASE_DIR / "data" / "structured_kb.json"
     chunks = get_chunks_for_embedding()
