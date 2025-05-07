@@ -152,12 +152,12 @@ def get_chunks_for_embedding() -> List[Dict[str, Any]]:
     html_files = load_all_html_files(str(html_dir))
 
     FILES = [
-        # ("alternative_services", "רפואה משלימה"),
-        # ("communication_clinic_services", "מרפאות תקשורת"),
+        ("alternative_services", "רפואה משלימה"),
+        ("communication_clinic_services", "מרפאות תקשורת"),
         ("dental_services", "מרפאות שיניים"),
-        # ("optometry_services", "אופטומטריה"),
-        # ("pragrency_services", "הריון"),
-        # ("workshops_services", "סדנאות בריאות")
+        ("optometry_services", "אופטומטריה"),
+        ("pragrency_services", "הריון"),
+        ("workshops_services", "סדנאות בריאות")
     ]
     return extract_chunks_from_html(html_files, FILES)
 

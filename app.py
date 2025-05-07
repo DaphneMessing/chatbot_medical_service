@@ -1,9 +1,11 @@
+#app.py
 
 import streamlit as st
 import requests
 import json
 
-API_URL = "http://localhost:8000/phase_1"  # Adjust if hosted elsewhere
+API_URL_PHASE_1 = "http://localhost:8000/phase_1"  
+API_URL_PHASE_2 = "http://localhost:8000/phase_2"  
 
 st.title("🩺 HMO Medical Assistant")
 
@@ -16,9 +18,7 @@ if "history" not in st.session_state:
 if "language_selected" not in st.session_state:
     st.session_state.language_selected = False
 
-
-
-# Step 1: Select Language
+# Select Language
 if not st.session_state.language_selected:
     lang_option = st.selectbox("Choose Language/ בחר שפה", ["Select", "en", "he"])
     if lang_option != "Select":
@@ -28,7 +28,7 @@ if not st.session_state.language_selected:
         
 if st.session_state.language_selected and not st.session_state.history:
     try:
-        response = requests.post(API_URL, json={
+        response = requests.post(API_URL_PHASE_1, json={
             "language": st.session_state.language,
             "user_input": "start",
             "hmo": "",
@@ -40,9 +40,6 @@ if st.session_state.language_selected and not st.session_state.history:
 
         result = response.json()
 
-        st.write("🔍 Raw response from server:")
-        st.write(result)
-
         assistant_reply = result.get("response", "⚠️ No response from server.")
         st.session_state.history.append({"role": "assistant", "content": assistant_reply})   
 
@@ -53,13 +50,12 @@ if st.session_state.language_selected and not st.session_state.history:
         )
 
 
-# Step 2: Chat Interface (Phase 1 or 2 depending on confirmation)
+# Chat Interface (Phase 1 or 2 depending on confirmation)
 if st.session_state.language_selected:
     for msg in st.session_state.history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    st.write(f"✅ Confirmation value: {st.session_state.inputs['confirmation']}")
     
     user_input = st.chat_input("Enter your message...")
 
@@ -70,9 +66,8 @@ if st.session_state.language_selected:
 
         if st.session_state.inputs.get("confirmation") is True:
             # PHASE 2: Ask about medical services
-
             try:
-                phase2_response = requests.post("http://localhost:8000/phase_2", json={
+                phase2_response = requests.post(API_URL_PHASE_2, json={
                     "hmo": st.session_state.inputs.get("hmo", ""),
                     "tier": st.session_state.inputs.get("tier", ""),
                     "lang": st.session_state.language,
@@ -88,9 +83,8 @@ if st.session_state.language_selected:
 
         else:
             # Phase 1: Continue information collection
-
             try:
-                response = requests.post(API_URL, json={
+                response = requests.post(API_URL_PHASE_1, json={
                     "language": st.session_state.language,
                     "hmo": st.session_state.inputs["hmo"],
                     "tier": st.session_state.inputs["tier"],
@@ -99,30 +93,13 @@ if st.session_state.language_selected:
                     "history": st.session_state.history[:-1]
                 })
                 result = response.json()
-
-                st.write("🔍 Raw response from server:")
-                st.write(result)
-
                 assistant_reply = result.get("response", "⚠️ No response from server.")
-                # try:
-                #     replay_data = json.loads(assistant_reply)
-                #     assistant_reply = replay_data.get("message", assistant_reply)
-
-                #     if replay_data.get("hmo"): 
-                #         st.session_state.inputs["hmo"] = replay_data["hmo"]
-                #     if replay_data.get("tier"):    
-                #         st.session_state.inputs["tier"] = replay_data["tier"]
-                #     if replay_data.get("confirmed") is not None:
-                #         st.session_state.inputs["confirmation"] = replay_data["confirmed"]
-
-                #     st.session_state.inputs = result["inputs"]
 
                 try:
                     # Set from the backend directly
                     st.session_state.inputs = result.get("inputs", st.session_state.inputs)
 
-                                    
-                    # ALSO UPDATE CONFIRMATION IF PRESENT
+                    #update the confirmation state based on the response
                     if "confirmed" in result:
                         st.session_state.inputs["confirmation"] = result["confirmed"]
 
@@ -132,9 +109,6 @@ if st.session_state.language_selected:
                 except Exception as e:
                     assistant_reply = f"❌ Error parsing response: {e}"
 
-
-                # except json.JSONDecodeError:
-                #     pass  # fallback to plain message if not JSON
 
             except Exception as e:
                 assistant_reply = f"❌ Error: {e}"

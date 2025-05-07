@@ -1,5 +1,5 @@
 
-# main.py
+# chat_api.py
 
 import os
 import logging
@@ -8,12 +8,10 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from logic.azure_calls import get_chat_completion, get_embedding
-from tools import tool_descriptions, collect_hmo, collect_insurance_tier, confirm_information
+from tools import tool_descriptions, collect_hmo, collect_insurance_tier, confirm_information, collect_age, collect_name, collect_card_number, collect_id_number, collect_gender
 from src.extract_data_embd import run_extraction
 from src.embd_chunks import normalize_hmo_tier, load_data, get_top_matches, get_answer_from_metadata, filter_by_hmo_tier, build_and_save_index, is_kb_ready
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-
 
 
 # Set up logging
@@ -44,14 +42,25 @@ else:
 
 def load_system_prompt(language: str) -> str:
     prompt_dir = Path(__file__).resolve().parent / "prompts"
-    filename = "info_prompt_en.txt" if language == "english" else "info_prompt_he.txt"
+    filename = "info_prompt_en.txt" if language == "en" else "info_prompt_he.txt"
     with open(prompt_dir / filename, "r", encoding="utf-8") as f:
         return f.read()
 
 def handle_tool_call(tool_name: str, arguments: str):
     data = json.loads(arguments)
-    if tool_name == "collect_hmo":
+    if tool_name == "collect_name":
+        return collect_name(data["first_name"], data["last_name"])
+
+    elif tool_name == "collect_id_number":
+        return collect_id_number(data["id_number"])
+    elif tool_name == "collect_gender":
+        return collect_gender(data["gender"])
+    elif tool_name == "collect_age":
+        return collect_age(data["age"])
+    elif tool_name == "collect_hmo":
         return collect_hmo(data["hmo"])
+    elif tool_name == "collect_card_number":
+            return collect_card_number(data["card_number"])
     elif tool_name == "collect_insurance_tier":
         return collect_insurance_tier(data["tier"])
     elif tool_name == "confirm_information":
@@ -81,7 +90,7 @@ def translate_to_hebrew(text: str) -> str:
 # Enable CORS (for Streamlit frontend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, use exact origin
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -105,7 +114,6 @@ class Phase2Request(BaseModel):
 
 @app.post("/phase_1")
 async def phase_1(request: ChatRequest):
-    print("✅ /phase_1 endpoint was called")
     try:
         logger.info("📥 Received request:")
         logger.info(f"Language: {request.language}")

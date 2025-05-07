@@ -66,12 +66,6 @@ def load_data():
         metadata = json.load(f)
     return index, metadata
 
-
-# def filter_by_hmo_tier(metadata: List[Dict], hmo: str, tier: str) -> List[int]:
-#     """Filter metadata by HMO and tier."""
-#     return [i for i, chunk in enumerate(metadata)
-#             if chunk.get("hmo") == hmo and chunk.get("tier") == tier]
-
 def filter_by_hmo_tier(metadata: List[Dict], hmo: str, tier: str) -> List[int]:
     """ Filter metadata by HMO and tier."""
     filtered_indices = []
